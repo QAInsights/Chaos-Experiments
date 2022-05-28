@@ -1,0 +1,243 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  creationTimestamp: null
+  labels:
+    cluster_id: c28f22e1-01c1-4e51-ade3-1ed58111f94f
+    subject: custom-chaos-workflow_litmus
+    workflow_id: 0430da73-deec-4b99-b73b-17057f7af51a
+    workflows.argoproj.io/controller-instanceid: c28f22e1-01c1-4e51-ade3-1ed58111f94f
+  name: custom-chaos-workflow-1653706915
+  namespace: litmus
+spec:
+  arguments:
+    parameters:
+    - name: adminModeNamespace
+      value: litmus
+  entrypoint: custom-chaos
+  podGC:
+    strategy: OnWorkflowCompletion
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  serviceAccountName: argo-chaos
+  templates:
+  - inputs: {}
+    metadata: {}
+    name: custom-chaos
+    outputs: {}
+    steps:
+    - - arguments: {}
+        name: install-chaos-experiments
+        template: install-chaos-experiments
+    - - arguments: {}
+        name: ec2-terminate-by-id-8tw
+        template: ec2-terminate-by-id-8tw
+    - - arguments: {}
+        name: revert-chaos
+        template: revert-chaos
+  - container:
+      args:
+      - kubectl apply -f /tmp/ec2-terminate-by-id-8tw.yaml -n {{workflow.parameters.adminModeNamespace}}
+        |  sleep 30
+      command:
+      - sh
+      - -c
+      image: litmuschaos/k8s:2.8.0
+      name: ""
+      resources: {}
+    inputs:
+      artifacts:
+      - name: ec2-terminate-by-id-8tw
+        path: /tmp/ec2-terminate-by-id-8tw.yaml
+        raw:
+          data: |
+            apiVersion: litmuschaos.io/v1alpha1
+            description:
+              message: |
+                Stopping an EC2 instance identified by ID.
+            kind: ChaosExperiment
+            metadata:
+              name: ec2-terminate-by-id
+              labels:
+                name: ec2-terminate-by-id
+                app.kubernetes.io/part-of: litmus
+                app.kubernetes.io/component: chaosexperiment
+                app.kubernetes.io/version: 2.8.0
+            spec:
+              definition:
+                scope: Cluster
+                permissions:
+                  - apiGroups:
+                      - ""
+                    resources:
+                      - pods
+                    verbs:
+                      - create
+                      - delete
+                      - get
+                      - list
+                      - patch
+                      - update
+                      - deletecollection
+                  - apiGroups:
+                      - ""
+                    resources:
+                      - events
+                    verbs:
+                      - create
+                      - get
+                      - list
+                      - patch
+                      - update
+                  - apiGroups:
+                      - ""
+                    resources:
+                      - configmaps
+                    verbs:
+                      - get
+                      - list
+                  - apiGroups:
+                      - ""
+                    resources:
+                      - pods/log
+                    verbs:
+                      - get
+                      - list
+                      - watch
+                  - apiGroups:
+                      - ""
+                    resources:
+                      - pods/exec
+                    verbs:
+                      - get
+                      - list
+                      - create
+                  - apiGroups:
+                      - batch
+                    resources:
+                      - jobs
+                    verbs:
+                      - create
+                      - list
+                      - get
+                      - delete
+                      - deletecollection
+                  - apiGroups:
+                      - litmuschaos.io
+                    resources:
+                      - chaosengines
+                      - chaosexperiments
+                      - chaosresults
+                    verbs:
+                      - create
+                      - list
+                      - get
+                      - patch
+                      - update
+                      - delete
+                  - apiGroups:
+                      - ""
+                    resources:
+                      - nodes
+                    verbs:
+                      - get
+                      - list
+                image: litmuschaos/go-runner:2.8.0
+                imagePullPolicy: Always
+                args:
+                  - -c
+                  - ./experiments -name ec2-terminate-by-id
+                command:
+                  - /bin/bash
+                env:
+                  - name: TOTAL_CHAOS_DURATION
+                    value: "30"
+                  - name: CHAOS_INTERVAL
+                    value: "30"
+                  - name: RAMP_TIME
+                    value: ""
+                  - name: MANAGED_NODEGROUP
+                    value: disable
+                  - name: EC2_INSTANCE_ID
+                    value: ""
+                  - name: REGION
+                    value: ""
+                  - name: SEQUENCE
+                    value: parallel
+                  - name: AWS_SHARED_CREDENTIALS_FILE
+                    value: /tmp/cloud_config.yml
+                  - name: LIB
+                    value: litmus
+                labels:
+                  name: ec2-terminate-by-id
+                  app.kubernetes.io/part-of: litmus
+                  app.kubernetes.io/component: experiment-job
+                  app.kubernetes.io/version: 2.8.0
+    metadata: {}
+    name: install-chaos-experiments
+    outputs: {}
+  - container:
+      args:
+      - -file=/tmp/chaosengine-ec2-terminate-by-id-8tw.yaml
+      - -saveName=/tmp/engine-name
+      image: litmuschaos/litmus-checker:2.8.0
+      name: ""
+      resources: {}
+    inputs:
+      artifacts:
+      - name: ec2-terminate-by-id-8tw
+        path: /tmp/chaosengine-ec2-terminate-by-id-8tw.yaml
+        raw:
+          data: |
+            apiVersion: litmuschaos.io/v1alpha1
+            kind: ChaosEngine
+            metadata:
+              namespace: "{{workflow.parameters.adminModeNamespace}}"
+              generateName: ec2-terminate-by-id-8tw
+              labels:
+                instance_id: 051767a3-7d5a-4e61-9e7d-ef878af62981
+                context: ec2-terminate-by-id-8tw_litmus
+                workflow_name: custom-chaos-workflow-1653706915
+            spec:
+              engineState: active
+              chaosServiceAccount: litmus-admin
+              experiments:
+                - name: ec2-terminate-by-id
+                  spec:
+                    components:
+                      env:
+                        - name: TOTAL_CHAOS_DURATION
+                          value: "30"
+                        - name: CHAOS_INTERVAL
+                          value: "30"
+                        - name: EC2_INSTANCE_ID
+                          value: i-0b85e55a2b35ae31d
+                        - name: REGION
+                          value: us-east-2
+                        - name: MANAGED_NODEGROUP
+                          value: disable
+                    probe: []
+              annotationCheck: "false"
+    metadata:
+      labels:
+        weight: "10"
+    name: ec2-terminate-by-id-8tw
+    outputs: {}
+  - container:
+      args:
+      - 'kubectl delete chaosengine -l ''instance_id in (051767a3-7d5a-4e61-9e7d-ef878af62981,
+        )'' -n {{workflow.parameters.adminModeNamespace}} '
+      command:
+      - sh
+      - -c
+      image: litmuschaos/k8s:2.8.0
+      name: ""
+      resources: {}
+    inputs: {}
+    metadata: {}
+    name: revert-chaos
+    outputs: {}
+status:
+  finishedAt: null
+  startedAt: null
